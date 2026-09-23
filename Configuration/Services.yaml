@@ -1,0 +1,9 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  # Tools are picked up through the mcp.tool tag of ToolInterface.
+  SvenJuergens\T3McpAddons\:
+    resource: '../Classes/*'
