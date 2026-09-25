@@ -2,11 +2,11 @@
 
 $EM_CONF[$_EXTKEY] = [
     'title' => 'MCP Addons',
-    'description' => 'Additional tools for the TYPO3 MCP server: workspace preview links and workspace publishing.',
+    'description' => 'Additional tools for the TYPO3 MCP server: workspace preview links and workspace publishing, plus a command for repeated scheduled publishing.',
     'category' => 'be',
     'author' => 'Sven Juergens',
     'state' => 'beta',
-    'version' => '0.1.0',
+    'version' => '0.2.0',
     'constraints' => [
         'depends' => [
             'typo3' => '13.4.0-14.3.99',

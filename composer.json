@@ -1,6 +1,6 @@
 {
     "name": "svenjuergens/t3-mcp-addons",
-    "description": "Additional tools for the TYPO3 MCP server (hn/typo3-mcp-server): workspace preview links and workspace publishing.",
+    "description": "Additional tools for the TYPO3 MCP server (hn/typo3-mcp-server): workspace preview links and workspace publishing, plus a command for repeated scheduled publishing.",
     "type": "typo3-cms-extension",
     "license": "GPL-2.0-or-later",
     "keywords": ["TYPO3", "MCP", "workspaces", "AI"],

@@ -10,6 +10,12 @@ without opening the backend.
 | `GetPreviewLink`   | Returns a workspace preview link (`ADMCMD_prev`) for a page, optionally for a specific language, plus the expiry date of the token. Warns when the preview will not show the page (hidden, start/end time, missing translation, unresolvable slug). |
 | `PublishWorkspace` | Publishes all pending changes of the current workspace. Supports `dryRun` to list what would go live.      |
 
+## Command
+
+| Command                        | Purpose |
+|--------------------------------|---------|
+| `mcp-addons:workspace:publish` | Publishes every workspace whose publication date (`publish_time`) is set and lies in the past. Unlike the core command `workspace:autopublish`, the date is not reset afterwards, so the command can run on a schedule and publishes the current workspace content on every run. Setting a past date switches automatic publishing on, clearing it switches it off. Supports `--dry-run`. |
+
 ## Requirements
 
 * TYPO3 13.4 or 14.3
@@ -34,6 +40,8 @@ server; no further configuration is needed. Flush the caches afterwards.
   the model to call it only on an explicit request and to run a dry run first.
   Leave the extension out, or restrict the MCP user, where publishing should
   stay a manual review step.
+* The same applies to `mcp-addons:workspace:publish`: schedule it only where
+  workspace content may go live without a review.
 
 ## License
 
