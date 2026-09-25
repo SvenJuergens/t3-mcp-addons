@@ -1,7 +1,7 @@
 # MCP Addons for TYPO3
 
 Additional tools for the [TYPO3 MCP server](https://github.com/hauptsacheNet/typo3-mcp-server)
-(`hn/typo3-mcp-server`). Both tools work on the workspace the MCP user is
+(`hn/typo3-mcp-server`). The workspace tools work on the workspace the MCP user is
 currently in, so drafts written through MCP can be reviewed and published
 without opening the backend.
 
@@ -9,6 +9,7 @@ without opening the backend.
 |--------------------|-----------------------------------------------------------------------------------------------------------|
 | `GetPreviewLink`   | Returns a workspace preview link (`ADMCMD_prev`) for a page, optionally for a specific language, plus the expiry date of the token. Warns when the preview will not show the page (hidden, start/end time, missing translation, unresolvable slug). |
 | `PublishWorkspace` | Publishes all pending changes of the current workspace. Supports `dryRun` to list what would go live.      |
+| `GetCurrentUser`   | Returns the backend user the MCP connection acts as: uid, username, name and email. Read-only, no parameters, only ever the current user. |
 
 ## Command
 
