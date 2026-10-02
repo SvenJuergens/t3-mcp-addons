@@ -14,7 +14,6 @@ namespace SvenJuergens\T3McpAddons\MCP\Tool;
 
 use Hn\McpServer\MCP\Tool\AbstractTool;
 use Mcp\Types\CallToolResult;
-use Mcp\Types\TextContent;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 
 /**
@@ -27,23 +26,26 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
  */
 final class GetCurrentUserTool extends AbstractTool
 {
+    use JsonResultTrait;
+
     /**
-     * Fields of be_users that may be returned, with their label.
+     * Text fields of be_users that may be returned besides the uid, with
+     * their key in the result.
      */
     private const FIELDS = [
-        'uid' => 'UID',
-        'username' => 'Username',
-        'realName' => 'Name',
-        'email' => 'Email',
+        'username' => 'username',
+        'realName' => 'name',
+        'email' => 'email',
     ];
 
     public function getSchema(): array
     {
         return [
-            'description' => 'Get the backend user this MCP connection acts as: uid, username, name'
-                . ' and email. Read-only, no parameters, and only ever about the current user -'
-                . ' other accounts cannot be looked up. Use it to know whose changes you are'
-                . ' making, e.g. before writing to a workspace.',
+            'description' => 'Get the backend user this MCP connection acts as, as a JSON object'
+                . ' with uid, username, name and email (null when not set). Read-only, no'
+                . ' parameters, and only ever about the current user - other accounts cannot'
+                . ' be looked up. Use it to know whose changes you are making, e.g. before'
+                . ' writing to a workspace.',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => new \stdClass(),
@@ -63,12 +65,12 @@ final class GetCurrentUserTool extends AbstractTool
             return $this->createErrorResult('No backend user is authenticated for this MCP connection.');
         }
 
-        $lines = [];
-        foreach (self::FIELDS as $field => $label) {
+        $data = ['uid' => (int)$backendUser->user['uid']];
+        foreach (self::FIELDS as $field => $key) {
             $value = trim((string)($backendUser->user[$field] ?? ''));
-            $lines[] = sprintf('%s: %s', $label, $value !== '' ? $value : '(not set)');
+            $data[$key] = $value !== '' ? $value : null;
         }
 
-        return new CallToolResult([new TextContent(implode("\n", $lines))]);
+        return $this->createJsonResult($data);
     }
 }

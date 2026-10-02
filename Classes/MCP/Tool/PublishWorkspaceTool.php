@@ -15,8 +15,11 @@ namespace SvenJuergens\T3McpAddons\MCP\Tool;
 use Hn\McpServer\MCP\Tool\AbstractTool;
 use Hn\McpServer\Service\WorkspaceContextService;
 use Mcp\Types\CallToolResult;
-use Mcp\Types\TextContent;
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
+use TYPO3\CMS\Core\SysLog\Error as SystemLogErrorClassification;
+use TYPO3\CMS\Core\SysLog\Type as SystemLogType;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Workspaces\Service\WorkspaceService;
 
@@ -30,9 +33,21 @@ use TYPO3\CMS\Workspaces\Service\WorkspaceService;
  */
 final class PublishWorkspaceTool extends AbstractTool
 {
+    use JsonResultTrait;
+
+    /**
+     * Fixed texts per failure reason - the logged error message itself never
+     * leaves the system.
+     */
+    private const HINTS = [
+        'denied' => 'Publishing was refused, check permissions and workspace stage.',
+        'system' => 'System error, see the TYPO3 log.',
+    ];
+
     public function __construct(
         private readonly WorkspaceService $workspaceService,
         private readonly WorkspaceContextService $workspaceContextService,
+        private readonly ConnectionPool $connectionPool,
     ) {}
 
     public function getSchema(): array
@@ -45,7 +60,8 @@ final class PublishWorkspaceTool extends AbstractTool
                 . ' manual rollback in the TYPO3 backend takes them back.'
                 . ' It ignores publish_time and publishes everything the current MCP user holds in'
                 . ' their workspace, across all pages.'
-                . ' Returns the list of published records. Fails when the user is not in a workspace.',
+                . ' Returns a JSON object with the workspace, the record count and the records per'
+                . ' table. Fails when the user is not in a workspace.',
             'inputSchema' => [
                 'type' => 'object',
                 'properties' => [
@@ -89,53 +105,40 @@ final class PublishWorkspaceTool extends AbstractTool
 
         $workspaceInfo = $this->workspaceContextService->getWorkspaceInfo();
         $cmd = $this->workspaceService->getCmdArrayForPublishWS($workspaceId);
-        $recordCount = $this->countRecords($cmd);
+        $dryRun = !empty($params['dryRun']);
+        $result = [
+            'workspace' => ['uid' => $workspaceId, 'title' => (string)$workspaceInfo['title']],
+            'dryRun' => $dryRun,
+            'published' => false,
+            'count' => $this->countRecords($cmd),
+            'records' => $this->listRecords($cmd),
+        ];
 
-        if ($recordCount === 0) {
-            return $this->createResult(sprintf(
-                'Workspace "%s" (%d) holds no pending changes, nothing to publish.',
-                $workspaceInfo['title'],
-                $workspaceId
-            ));
+        if ($result['count'] === 0 || $dryRun) {
+            return $this->createJsonResult($result);
         }
 
-        $recordList = $this->describeRecords($cmd);
-
-        if (!empty($params['dryRun'])) {
-            return $this->createResult(sprintf(
-                "Dry run - workspace \"%s\" (%d) would publish %d records:\n%s",
-                $workspaceInfo['title'],
-                $workspaceId,
-                $recordCount,
-                $recordList
-            ));
-        }
-
+        $lastLogUid = $this->getLastLogUid();
         $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
         $dataHandler->start([], $cmd);
         $dataHandler->process_cmdmap();
 
-        if ($dataHandler->errorLog !== []) {
-            return $this->createErrorResult(sprintf(
-                "Publishing workspace \"%s\" (%d) failed:\n%s",
-                $workspaceInfo['title'],
-                $workspaceId,
-                implode("\n", $dataHandler->errorLog)
-            ));
+        if ($dataHandler->errorLog === []) {
+            $result['published'] = true;
+            return $this->createJsonResult($result);
         }
 
-        return $this->createResult(sprintf(
-            "Published %d records from workspace \"%s\" (%d) to the live site:\n%s",
-            $recordCount,
-            $workspaceInfo['title'],
-            $workspaceId,
-            $recordList
-        ));
-    }
+        // Error texts of DataHandler may quote database messages; only the
+        // classification, table and uid of the logged errors go out.
+        $failed = $this->collectFailedRecords($lastLogUid);
+        unset($result['published']);
 
-    private function createResult(string $message): CallToolResult
-    {
-        return new CallToolResult([new TextContent($message)]);
+        return $this->createJsonResult([
+            'error' => 'Publishing failed, other records of the workspace may have been published.'
+                . ' Details are in the TYPO3 log.',
+            ...$result,
+            'failed' => $failed,
+        ], true);
     }
 
     /**
@@ -151,14 +154,73 @@ final class PublishWorkspaceTool extends AbstractTool
     }
 
     /**
+     * Records per table; an object even when empty, so the JSON shape stays
+     * the same.
+     *
      * @param array<string, array<int, mixed>> $cmd
+     * @return array<string, int[]>|\stdClass
      */
-    private function describeRecords(array $cmd): string
+    private function listRecords(array $cmd): array|\stdClass
     {
-        $lines = [];
+        $list = [];
         foreach ($cmd as $table => $records) {
-            $lines[] = sprintf('- %s: %s', $table, implode(', ', array_keys($records)));
+            $list[$table] = array_map('intval', array_keys($records));
         }
-        return implode("\n", $lines);
+        return $list !== [] ? $list : new \stdClass();
+    }
+
+    private function getLastLogUid(): int
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_log');
+
+        return (int)$queryBuilder
+            ->selectLiteral('MAX(uid)')
+            ->from('sys_log')
+            ->executeQuery()
+            ->fetchOne();
+    }
+
+    /**
+     * Errors DataHandler logged for the current user since $lastLogUid, one
+     * entry per record. Reads the classification only, never the message.
+     *
+     * @return list<array{table: ?string, uid: ?int, reason: string, hint: string}>
+     */
+    private function collectFailedRecords(int $lastLogUid): array
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('sys_log');
+        $rows = $queryBuilder
+            ->select('error', 'tablename', 'recuid')
+            ->from('sys_log')
+            ->where(
+                $queryBuilder->expr()->gt('uid', $queryBuilder->createNamedParameter($lastLogUid, Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('userid', $queryBuilder->createNamedParameter((int)($GLOBALS['BE_USER']->user['uid'] ?? 0), Connection::PARAM_INT)),
+                $queryBuilder->expr()->eq('type', $queryBuilder->createNamedParameter(SystemLogType::DB, Connection::PARAM_INT)),
+                $queryBuilder->expr()->gt('error', $queryBuilder->createNamedParameter(SystemLogErrorClassification::MESSAGE, Connection::PARAM_INT))
+            )
+            ->orderBy('uid')
+            ->executeQuery()
+            ->fetchAllAssociative();
+
+        $failed = [];
+        foreach ($rows as $row) {
+            $table = (string)$row['tablename'] !== '' ? (string)$row['tablename'] : null;
+            $uid = (int)$row['recuid'] > 0 ? (int)$row['recuid'] : null;
+            $reason = (int)$row['error'] === SystemLogErrorClassification::USER_ERROR ? 'denied' : 'system';
+            $key = $table . ':' . $uid;
+
+            // A system error outweighs a refusal for the same record.
+            if (isset($failed[$key]) && ($failed[$key]['reason'] === 'system' || $reason === 'denied')) {
+                continue;
+            }
+            $failed[$key] = [
+                'table' => $table,
+                'uid' => $uid,
+                'reason' => $reason,
+                'hint' => self::HINTS[$reason],
+            ];
+        }
+
+        return array_values($failed);
     }
 }

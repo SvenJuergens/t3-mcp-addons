@@ -16,7 +16,6 @@ use Hn\McpServer\MCP\Tool\AbstractTool;
 use Hn\McpServer\Service\LanguageService;
 use Hn\McpServer\Service\WorkspaceContextService;
 use Mcp\Types\CallToolResult;
-use Mcp\Types\TextContent;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
@@ -35,6 +34,8 @@ use TYPO3\CMS\Workspaces\Preview\PreviewUriBuilder;
  */
 final class GetPreviewLinkTool extends AbstractTool
 {
+    use JsonResultTrait;
+
     public function __construct(
         private readonly PreviewUriBuilder $previewUriBuilder,
         private readonly WorkspaceContextService $workspaceContextService,
@@ -47,11 +48,12 @@ final class GetPreviewLinkTool extends AbstractTool
         $schema = [
             'description' => 'Get a preview link for a page that shows the current workspace draft'
                 . ' instead of the published version. Use this to check content written through MCP'
-                . ' before publishing it. Returns the URL plus the date it is valid until; the link'
+                . ' before publishing it. Returns a JSON object with the URL, the date it is valid'
+                . ' until (validUntil) and a list of warnings; the link'
                 . ' carries a token that unlocks the entire workspace, not just this page, so it can'
                 . ' be opened once and browsed from there. The token expires after 48 hours unless'
                 . ' the workspace record or user TSconfig says otherwise.'
-                . ' Appends a warning when the preview will not show the page: hidden, not published'
+                . ' Adds a warning when the preview will not show the page: hidden, not published'
                 . ' yet (starttime), expired (endtime), not translated into the requested language,'
                 . ' or the link does not resolve to this page.'
                 . ' Fails when the page does not exist, and when the user is not in a workspace -'
@@ -140,26 +142,12 @@ final class GetPreviewLinkTool extends AbstractTool
         try {
             $uri = $this->previewUriBuilder->buildUriForPage($pageId, $languageId);
         } catch (\Throwable $e) {
+            // The exception text stays in the log, the client gets a fixed hint.
+            $this->logException($e, $this->getName());
             return $this->createErrorResult(sprintf(
-                'Could not build a preview link for page %d: %s',
-                $pageId,
-                $e->getMessage()
+                'Could not build a preview link for page %d. Details are in the TYPO3 log.',
+                $pageId
             ));
-        }
-
-        $workspaceInfo = $this->workspaceContextService->getWorkspaceInfo();
-        $message = sprintf(
-            "Preview link for page %d%s in workspace \"%s\" (%d):\n%s",
-            $pageId,
-            $languageId > 0 ? sprintf(' (language "%s")', $params['language']) : '',
-            $workspaceInfo['title'],
-            $workspaceId,
-            $uri
-        );
-
-        $validUntil = $this->getExpiryDate($uri);
-        if ($validUntil !== null) {
-            $message .= sprintf("\n\nValid until %s. It unlocks the whole workspace, not just this page.", $validUntil);
         }
 
         if ($languageId > 0 && $translation === null) {
@@ -170,11 +158,18 @@ final class GetPreviewLinkTool extends AbstractTool
         } else {
             $warnings = $this->collectWarnings($translation ?? $page, $uri);
         }
-        if ($warnings !== []) {
-            $message .= "\n\nWarning:\n- " . implode("\n- ", $warnings);
-        }
 
-        return new CallToolResult([new TextContent($message)]);
+        $workspaceInfo = $this->workspaceContextService->getWorkspaceInfo();
+
+        return $this->createJsonResult([
+            'page' => $pageId,
+            'language' => $languageId > 0 ? (string)$params['language'] : null,
+            'workspace' => ['uid' => $workspaceId, 'title' => (string)$workspaceInfo['title']],
+            'url' => $uri,
+            'validUntil' => $this->getExpiryDate($uri),
+            'note' => 'The link unlocks the whole workspace, not just this page.',
+            'warnings' => $warnings,
+        ]);
     }
 
     /**
@@ -283,7 +278,8 @@ final class GetPreviewLinkTool extends AbstractTool
     }
 
     /**
-     * Look up the expiry of the token that was just written to sys_preview.
+     * Look up the expiry of the token that was just written to sys_preview,
+     * as ISO 8601 date.
      */
     private function getExpiryDate(string $uri): ?string
     {
@@ -310,6 +306,6 @@ final class GetPreviewLinkTool extends AbstractTool
             return null;
         }
 
-        return date('Y-m-d H:i', (int)$endtime);
+        return date('c', (int)$endtime);
     }
 }

@@ -9,7 +9,37 @@ without opening the backend.
 |--------------------|-----------------------------------------------------------------------------------------------------------|
 | `GetPreviewLink`   | Returns a workspace preview link (`ADMCMD_prev`) for a page, optionally for a specific language, plus the expiry date of the token. Warns when the preview will not show the page (hidden, start/end time, missing translation, unresolvable slug). |
 | `PublishWorkspace` | Publishes all pending changes of the current workspace. Supports `dryRun` to list what would go live.      |
-| `GetCurrentUser`   | Returns the backend user the MCP connection acts as: uid, username, name and email. Read-only, no parameters, only ever the current user. |
+| `GetCurrentUser`   | Returns the backend user the MCP connection acts as: `uid`, `username`, `name` and `email` (`null` when not set). Read-only, no parameters, only ever the current user. |
+
+## Results and errors
+
+Every tool answers with a JSON object. Errors carry an `error` text and are
+flagged with `isError`:
+
+```json
+{"error": "Page 999 does not exist."}
+```
+
+Error texts never quote messages from the system. Exceptions and database
+errors are written to the TYPO3 log; the client only gets a fixed hint. When
+publishing fails, `PublishWorkspace` lists the affected records with a reason
+taken from the error classification of the log entry, not from its message:
+
+```json
+{
+  "error": "Publishing failed, other records of the workspace may have been published. Details are in the TYPO3 log.",
+  "workspace": {"uid": 1, "title": "Editing"},
+  "dryRun": false,
+  "count": 2,
+  "records": {"tt_content": [12, 13]},
+  "failed": [
+    {"table": "tt_content", "uid": 13, "reason": "denied", "hint": "Publishing was refused, check permissions and workspace stage."}
+  ]
+}
+```
+
+`reason` is `denied` for user errors (permissions, stage) and `system` for
+everything else.
 
 ## Command
 
