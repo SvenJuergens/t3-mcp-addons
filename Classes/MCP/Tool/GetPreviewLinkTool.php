@@ -21,6 +21,7 @@ use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\WorkspaceRestriction;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Workspaces\Preview\PreviewUriBuilder;
 
 /**
@@ -37,7 +38,6 @@ final class GetPreviewLinkTool extends AbstractTool
     use JsonResultTrait;
 
     public function __construct(
-        private readonly PreviewUriBuilder $previewUriBuilder,
         private readonly WorkspaceContextService $workspaceContextService,
         private readonly LanguageService $languageService,
         private readonly ConnectionPool $connectionPool,
@@ -140,7 +140,9 @@ final class GetPreviewLinkTool extends AbstractTool
         }
 
         try {
-            $uri = $this->previewUriBuilder->buildUriForPage($pageId, $languageId);
+            // PreviewUriBuilder reads the backend user in its constructor, so it must not be
+            // injected: the tool is built before authentication, when no BE_USER exists yet.
+            $uri = GeneralUtility::makeInstance(PreviewUriBuilder::class)->buildUriForPage($pageId, $languageId);
         } catch (\Throwable $e) {
             // The exception text stays in the log, the client gets a fixed hint.
             $this->logException($e, $this->getName());
