@@ -51,7 +51,7 @@ everything else.
 
 * TYPO3 13.4 or 14.3
 * `typo3/cms-workspaces`
-* `hn/typo3-mcp-server` 0.6
+* `hn/typo3-mcp-server` 0.6 or later (below 1.0)
 
 ## Installation
 
