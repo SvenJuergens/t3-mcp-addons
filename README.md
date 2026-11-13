@@ -45,7 +45,9 @@ can restrict the file mounts, though, so the choice decides which folders
 MCP clients may upload to.
 
 How it works: an XCLASS of `Hn\McpServer\Service\WorkspaceContextService`
-replaces `switchToOptimalWorkspace()`.
+replaces `switchToOptimalWorkspace()`. As a safety net in case the XCLASS ever
+stops taking effect, a listener on `BeforeRecordWriteEvent` refuses every
+`WriteTable` call that is not in the chosen workspace.
 
 TYPO3 13 and 14 register the setting differently: TYPO3 13 through
 `$GLOBALS['TYPO3_USER_SETTINGS']` of EXT:setup (`ext_tables.php`), TYPO3 14
