@@ -15,6 +15,7 @@
         "hn/typo3-mcp-server": ">=0.6.0 <1.0",
         "typo3/cms-backend": "^13.4 || ^14.3",
         "typo3/cms-core": "^13.4 || ^14.3",
+        "typo3/cms-setup": "^13.4 || ^14.3",
         "typo3/cms-workspaces": "^13.4 || ^14.3"
     },
     "autoload": {

@@ -1,15 +1,58 @@
 # MCP Addons for TYPO3
 
 Additional tools for the [TYPO3 MCP server](https://github.com/hauptsacheNet/typo3-mcp-server)
-(`hn/typo3-mcp-server`). The workspace tools work on the workspace the MCP user is
-currently in, so drafts written through MCP can be reviewed and published
-without opening the backend.
+(`hn/typo3-mcp-server`). The workspace tools work on the MCP workspace the user
+has chosen (see [MCP workspace](#mcp-workspace)), so drafts written through MCP
+can be reviewed and published without opening the backend.
 
 | Tool               | Purpose                                                                                                   |
 |--------------------|-----------------------------------------------------------------------------------------------------------|
 | `GetPreviewLink`   | Returns a workspace preview link (`ADMCMD_prev`) for a page, optionally for a specific language, plus the expiry date of the token. Warns when the preview will not show the page (hidden, start/end time, missing translation, unresolvable slug). |
 | `PublishWorkspace` | Publishes all pending changes of the current workspace. Supports `dryRun` to list what would go live.      |
 | `GetCurrentUser`   | Returns the backend user the MCP connection acts as: `uid`, `username`, `name` and `email` (`null` when not set). Read-only, no parameters, only ever the current user. |
+
+## MCP workspace
+
+Out of the box the MCP server works in the alphabetically first workspace the
+user can write to, creates a workspace of its own when there is none, or
+falls back to live. With several workspaces that is hard to predict. This
+add-on replaces the selection:
+
+* Every backend user chooses the MCP workspace in the user settings
+  (**User settings > MCP workspace**). Only workspaces the user may write to
+  are offered, live never.
+* MCP clients read and write only in that workspace. The workspace switcher
+  of the backend has no influence, so the user can keep working, publishing
+  or switching to live without moving the MCP workspace. `PublishWorkspace`
+  publishes the MCP workspace.
+* Administrators can preset the choice in the backend user record (next to
+  the workspace permissions; for administrator accounts in the options tab).
+  The list shows the workspaces of the edited user, group memberships
+  included. A new user has to be saved first, before that only "none" is
+  offered. The user can change a preset in the user settings.
+* A changed choice applies from the next request on.
+* Without a valid choice - none made, workspace deleted, user removed from it -
+  MCP access is blocked. The MCP connection still works, but every tool that
+  touches content answers with a message that tells the user where to choose
+  a workspace (`GetCurrentUser` keeps working, it reads no content). There is
+  no fallback and no automatically created workspace.
+* After installing or updating, every MCP user is blocked until a workspace
+  is chosen.
+
+Uploaded files are not affected by the choice in TYPO3 terms: files are not
+workspace-versioned, an upload lands in the file storage at once. A workspace
+can restrict the file mounts, though, so the choice decides which folders
+MCP clients may upload to.
+
+How it works: an XCLASS of `Hn\McpServer\Service\WorkspaceContextService`
+replaces `switchToOptimalWorkspace()`.
+
+TYPO3 13 and 14 register the setting differently: TYPO3 13 through
+`$GLOBALS['TYPO3_USER_SETTINGS']` of EXT:setup (`ext_tables.php`), TYPO3 14
+through `ExtensionManagementUtility::addUserSetting()`
+(`Configuration/TCA/Overrides/be_users.php`). The choice is stored in
+`be_users.tx_t3mcpaddons_workspace`; run the database analyzer after
+installing.
 
 ## Results and errors
 
@@ -51,6 +94,7 @@ everything else.
 
 * TYPO3 13.4 or 14.3
 * `typo3/cms-workspaces`
+* `typo3/cms-setup` (TYPO3 13; part of `typo3/cms-backend` in TYPO3 14)
 * `hn/typo3-mcp-server` 0.6 or later (below 1.0)
 
 ## Installation

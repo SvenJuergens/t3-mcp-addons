@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+	<file source-language="en" target-language="de" datatype="plaintext" original="EXT:t3_mcp_addons/Resources/Private/Language/locallang.xlf" date="2026-11-13T00:00:00Z" product-name="t3_mcp_addons">
+		<header/>
+		<body>
+			<trans-unit id="be_users.tx_t3mcpaddons_workspace" resname="be_users.tx_t3mcpaddons_workspace">
+				<source>MCP workspace</source>
+				<target>MCP-Workspace</target>
+			</trans-unit>
+			<trans-unit id="be_users.tx_t3mcpaddons_workspace.description" resname="be_users.tx_t3mcpaddons_workspace.description">
+				<source>MCP clients such as AI assistants read and write only in this workspace, regardless of the workspace you are working in. Without a choice, MCP access is blocked.</source>
+				<target>MCP-Clients wie KI-Assistenten lesen und schreiben nur in diesem Workspace, unabhängig davon, in welchem Workspace Sie selbst arbeiten. Ohne Auswahl ist der MCP-Zugriff gesperrt.</target>
+			</trans-unit>
+			<trans-unit id="be_users.tx_t3mcpaddons_workspace.none" resname="be_users.tx_t3mcpaddons_workspace.none">
+				<source>– none: MCP access is blocked –</source>
+				<target>– keiner: MCP-Zugriff gesperrt –</target>
+			</trans-unit>
+			<trans-unit id="be_users.tx_t3mcpaddons_workspace.unavailable" resname="be_users.tx_t3mcpaddons_workspace.unavailable">
+				<source>Workspace %d (no longer available – MCP access is blocked)</source>
+				<target>Workspace %d (nicht mehr verfügbar – MCP-Zugriff gesperrt)</target>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>
