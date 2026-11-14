@@ -7,9 +7,13 @@ can be reviewed and published without opening the backend.
 
 | Tool               | Purpose                                                                                                   |
 |--------------------|-----------------------------------------------------------------------------------------------------------|
-| `GetPreviewLink`   | Returns a workspace preview link (`ADMCMD_prev`) for a page, optionally for a specific language, plus the expiry date of the token. Warns when the preview will not show the page (hidden, start/end time, missing translation, unresolvable slug). |
 | `PublishWorkspace` | Publishes all pending changes of the current workspace. Supports `dryRun` to list what would go live.      |
 | `GetCurrentUser`   | Returns the backend user the MCP connection acts as: `uid`, `username`, `name` and `email` (`null` when not set). Read-only, no parameters, only ever the current user. |
+
+Workspace preview links come from the MCP server itself: `GetPage` and
+`GetPageTree` show a preview URL for every page with unpublished changes, and
+`WriteTable` and `ReadTable` return a `preview_url` for the record. The
+`GetPreviewLink` tool this add-on shipped up to version 0.5 is gone.
 
 ## MCP workspace
 
@@ -97,7 +101,7 @@ everything else.
 * TYPO3 13.4 or 14.3
 * `typo3/cms-workspaces`
 * `typo3/cms-setup` (TYPO3 13; part of `typo3/cms-backend` in TYPO3 14)
-* `hn/typo3-mcp-server` 0.6 or later (below 1.0)
+* `hn/typo3-mcp-server` 0.7 or later (below 1.0)
 
 ## Installation
 
@@ -110,9 +114,6 @@ server; no further configuration is needed. Flush the caches afterwards.
 
 ## Notes
 
-* A preview token unlocks the whole workspace, not just the requested page.
-  Tokens expire after 48 hours unless the workspace record or user TSconfig
-  (`options.workspaces.previewLinkTTLHours`) says otherwise.
 * `PublishWorkspace` cannot be undone through MCP. The tool description tells
   the model to call it only on an explicit request and to run a dry run first.
   Leave the extension out, or restrict the MCP user, where publishing should
